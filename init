@@ -1,0 +1,99 @@
+#!/bin/bash
+
+##### Constants
+ETC="/opt/homebrew/etc"
+PHP_VERSION="8.1"
+PHP_PATH="$ETC/php/$PHP_VERSION"
+HTTPD_PATH="$ETC/httpd"
+
+##### Functions
+backup() {
+  if ! [[ -e $1 ]]; then
+    echo "! Not found \"$1\""
+    return
+  fi
+  
+  if ! [[ -e $2 ]]; then
+    echo "! Not found \"$2\""
+    return
+  fi
+
+  if [ -f $1.old ]; then
+    echo "Backup exist \"$1\""
+  else
+    echo "Backup \"$1.old\""
+    cp $1 $1.old
+  fi
+  echo "Replace \"$1\""
+  cp $2 $1
+}
+
+services() {
+  brew services $1 mysql;
+  brew services $1 php
+  brew services $1 httpd
+}
+
+folder() {
+  if ! [[ -d $1 ]]; then
+    echo "Create \"$1\""
+    mkdir $1
+  else
+    echo "Exist \"$1\""
+  fi
+}
+
+file() {
+  if ! [[ -f $2 ]]; then
+    echo "Copy \"$2\""
+    cp $1 $2
+  else
+    echo "Exist \"$2\""
+  fi
+}
+
+##### Init PHP to Apache settings
+echo "Start initialize Apache - PHP@$PHP_VERSION - MySQL server"
+echo ""
+
+#Check PHP installation
+if ! [[ -e "$PHP_PATH" ]]; then
+  echo "! Can't find PHP@$PHP_VERSION at \"$PHP_PATH\"" >&2
+  exit 1
+fi
+  
+echo "PHP $PHP_VERSION where found"
+#Stop services
+services stop
+
+#Create backup files
+backup "$PHP_PATH/php.ini" "php.ini"
+#backup "$PHP_PATH/php-fpm.ini" "php-fpm.ini"
+backup "$HTTPD_PATH/httpd.conf" "httpd.conf"
+backup "$HTTPD_PATH/extra/httpd-ssl.conf" "httpd-ssl.conf"
+backup "$HTTPD_PATH/extra/httpd-vhosts.conf" "httpd-vhosts.conf"
+backup "$ETC/my.cnf" "my.cnf"
+
+#Create "Sites" folder
+echo ""
+echo "Create "~/Sites" folder"
+folder ~/Sites
+folder ~/Sites/localhost
+folder ~/Sites/_LOGS
+folder ~/Sites/_MAILS
+echo "Create access_log.log and error_log.log"
+touch ~/Sites/_LOGS/access_log.log && touch ~/Sites/_LOGS/error_log.log
+if ! [[ -d "$HOME/Sites/php.lo/" ]]; then
+  echo "Create \"~/Sites/php.lo/\" folder"
+  mkdir -p ~/Sites/php.lo/ && touch ~/Sites/php.lo/index.php
+  echo "<?php phpinfo(); ?>" > ~/Sites/php.lo/index.php
+  echo "127.0.0.1    php.lo" | sudo tee -a /etc/hosts
+else
+  echo "Exist \"~/Sites/php.lo/\""
+fi
+
+#Start services
+services start
+
+echo ""
+echo "Initialization completed."

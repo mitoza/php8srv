@@ -1,0 +1,52 @@
+#!/bin/bash
+
+##### Constants
+ETC="/opt/homebrew/etc"
+PHP_VERSION="8.1"
+PHP_PATH="$ETC/php/$PHP_VERSION"
+HTTPD_PATH="$ETC/httpd"
+
+##### Functions
+restore() {
+  if [ -f "$1.old" ]; then
+    mv "$1.old" "$1"
+    echo "Restore \"$1\""
+  else
+    echo "! Not found \"$1.old\" file."
+    return
+  fi
+}
+
+services() {
+  brew services $1 mysql;
+  brew services $1 php
+  brew services $1 httpd
+}
+
+##### Restore Apache - PHP@$PHP_VERSION - MySQL settings
+echo "Restore default Apache - PHP $PHP_VERSION - MySQL server"
+echo ""   
+
+#Check PHP installation
+if ! [[ -e "$PHP_PATH" ]]; then
+  echo "! Can't find PHP@$PHP_VERSION at \"$PHP_PATH\"" >&2
+  exit 1
+fi
+
+echo "PHP $PHP_VERSION where found"
+#Stop services
+services stop
+
+#Restore backup files
+restore "$PHP_PATH/php.ini"
+#restore "$PHP_PATH/php-fpm.ini"
+restore "$HTTPD_PATH/httpd.conf"
+restore "$HTTPD_PATH/extra/httpd-ssl.conf"
+restore "$HTTPD_PATH/extra/httpd-vhosts.conf"
+restore "$ETC/my.cnf"
+
+#Start services
+services start
+
+echo "" 
+echo "Settings default settings completed."
